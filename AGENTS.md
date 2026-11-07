@@ -4,13 +4,13 @@
 
 - `PLANS.md` задаёт порядок и статус этапов.
 - `docs/specs/architecture-and-database.md` задаёт требования этапа 1.
-- `docs/specs/authentication.md` и `docs/specs/backend-api.md` задают будущие контракты; не реализовывать их раньше соответствующего этапа.
+- `docs/specs/authentication.md` задаёт реализованный контракт входа; `docs/specs/backend-api.md` задаёт контракт следующего этапа.
 
 ## Стек и архитектура
 
 - Node.js 24 LTS, npm, TypeScript strict, NestJS, PostgreSQL, Prisma, class-validator, class-transformer и Swagger.
 - Слои: Controller → Service → Repository → Prisma/PostgreSQL. Контроллер не обращается к Prisma напрямую.
-- Модули: `health`, `prisma`, а также пока пустые `auth` и `recipes` для следующих этапов.
+- Модули: `health`, `prisma`, `auth`; `recipes` пока без маршрутов.
 - Схема базы меняется через сохраняемые Prisma-миграции. Не использовать автоматическую синхронизацию схемы.
 - Не добавлять микросервисы, CQRS, очереди, кеш и универсальный базовый репозиторий без нового требования.
 
@@ -26,6 +26,7 @@
 - `npm ci` — установить зависимости из lock-файла.
 - `npm run db:generate` — сгенерировать Prisma Client.
 - `npm run db:migrate` — применить сохранённые миграции.
+- `npm run db:seed-admin` — однократно создать администратора из `ADMIN_EMAIL` и `ADMIN_PASSWORD`; повторный запуск не меняет запись.
 - `npm run dev` — запустить приложение из TypeScript.
 - `npm run typecheck`, `npm run build`, `npm run start` — проверка типов, сборка и запуск сборки.
 

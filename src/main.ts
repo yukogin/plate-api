@@ -22,7 +22,11 @@ async function bootstrap(): Promise<void> {
 
   const document = SwaggerModule.createDocument(
     app,
-    new DocumentBuilder().setTitle('Рецепты API').setVersion('1.0').build(),
+    new DocumentBuilder()
+      .setTitle('Рецепты API')
+      .setVersion('1.0')
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
+      .build(),
   );
   SwaggerModule.setup('api/docs', app, document);
   await app.listen(config.port);
