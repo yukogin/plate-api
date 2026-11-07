@@ -10,6 +10,6 @@ import { UsersRepository } from './users.repository';
   imports: [JwtModule.register({})],
   controllers: [AuthController],
   providers: [AuthService, UsersRepository, JwtAuthGuard, RolesGuard],
-  exports: [JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

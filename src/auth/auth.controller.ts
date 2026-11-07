@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiErrorDto } from '../common/api-error.dto';
 import { AuthService } from './auth.service';
 import { LoginDto, LoginResponseDto } from './login.dto';
 
@@ -12,8 +13,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Вход по email и паролю' })
   @ApiOkResponse({ type: LoginResponseDto })
-  @ApiBadRequestResponse({ description: 'Некорректный запрос' })
-  @ApiUnauthorizedResponse({ description: 'Неверный email или пароль' })
+  @ApiBadRequestResponse({ type: ApiErrorDto, description: 'Некорректный запрос' })
+  @ApiUnauthorizedResponse({ type: ApiErrorDto, description: 'Неверный email или пароль' })
   login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
     return this.auth.login(dto);
   }

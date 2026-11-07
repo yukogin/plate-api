@@ -4,13 +4,15 @@
 
 - `PLANS.md` задаёт порядок и статус этапов.
 - `docs/specs/architecture-and-database.md` задаёт требования этапа 1.
-- `docs/specs/authentication.md` задаёт реализованный контракт входа; `docs/specs/backend-api.md` задаёт контракт следующего этапа.
+- `docs/specs/authentication.md` задаёт контракт входа; `docs/specs/backend-api.md` задаёт реализованный контракт рецептов.
 
 ## Стек и архитектура
 
 - Node.js 24 LTS, npm, TypeScript strict, NestJS, PostgreSQL, Prisma, class-validator, class-transformer и Swagger.
 - Слои: Controller → Service → Repository → Prisma/PostgreSQL. Контроллер не обращается к Prisma напрямую.
-- Модули: `health`, `prisma`, `auth`; `recipes` пока без маршрутов.
+- Модули: `health`, `prisma`, `auth`, `recipes`.
+- Операции чтения рецептов публичны; на каждой операции записи применять `AdminOnly` (JWT и проверка текущей роли в базе).
+- DTO различают отсутствие поля и `null` при PATCH. Ответы ошибок имеют `statusCode`, `error`, `message: string[]`.
 - Схема базы меняется через сохраняемые Prisma-миграции. Не использовать автоматическую синхронизацию схемы.
 - Не добавлять микросервисы, CQRS, очереди, кеш и универсальный базовый репозиторий без нового требования.
 

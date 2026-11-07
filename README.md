@@ -1,6 +1,6 @@
 # Рецепты — Backend API
 
-Этапы 1–2: каркас NestJS, схема PostgreSQL, health и вход администратора по JWT. Доступны `GET /api/v1/health` и `POST /api/v1/auth/login`. Маршруты рецептов появятся на этапе 3; их контракт описан в `docs/specs/backend-api.md`.
+Этапы 1–3: REST API общего каталога рецептов на NestJS и PostgreSQL. Доступны health, вход администратора и CRUD рецептов. Список и детали публичны; создание, изменение и удаление требуют роль `admin`. Контракт описан в `docs/specs/backend-api.md`.
 
 ## Требования
 
@@ -75,7 +75,7 @@ curl -i -X POST http://localhost:3000/api/v1/auth/login \
   -d '{"email":"admin@example.com","password":"<пароль из ADMIN_PASSWORD>"}'
 ```
 
-Подставьте настроенные данные. Ответ 200 содержит `accessToken`, `tokenType: "Bearer"`, `expiresIn` в секундах и `user` с `id`, `email`, `role`. Для будущих защищённых операций передавайте `Authorization: Bearer <accessToken>`. Токен подписан HS256, содержит `sub`, `iat`, `exp`; на защищённом запросе пользователь и текущая роль читаются из базы. Без токена, с неверным или истёкшим токеном ожидается 401; для роли `user` на admin-операции — 403. Проверить эти ответы на реальных операциях записи можно будет на этапе 3.
+Подставьте настроенные данные. Ответ 200 содержит `accessToken`, `tokenType: "Bearer"`, `expiresIn` в секундах и `user` с `id`, `email`, `role`. Для защищённых операций передавайте `Authorization: Bearer <accessToken>`. Токен подписан HS256, содержит `sub`, `iat`, `exp`; на защищённом запросе пользователь и текущая роль читаются из базы. Без токена, с неверным или истёкшим токеном запись возвращает 401; для роли `user` — 403.
 
 Неверные email или пароль дают одинаковые 401 и сообщение «Неверный email или пароль». Пустой пароль, неверный email и неизвестные поля дают 400. Публичной регистрации, refresh token и logout с отзывом токена нет.
 
@@ -88,3 +88,65 @@ curl -i -X POST http://localhost:3000/api/v1/auth/login \
 5. Откройте `http://localhost:3000/api/docs`: должны быть login DTO и Bearer-схема.
 
 Не выполняйте seed с временными проверочными данными в основной базе. Для изолированной проверки создайте отдельную локальную базу и задайте для команды её `DATABASE_URL`.
+
+## API рецептов
+
+| Метод | Путь | Доступ | Успех |
+| --- | --- | --- | --- |
+| GET | `/api/v1/recipes` | публичный | 200 |
+| GET | `/api/v1/recipes/:id` | публичный | 200 |
+| POST | `/api/v1/recipes` | admin | 201 |
+| PATCH | `/api/v1/recipes/:id` | admin | 200 |
+| DELETE | `/api/v1/recipes/:id` | admin | 204 без тела |
+
+Список принимает `page` (от 1, по умолчанию 1), `limit` (1–100, по умолчанию 20), `search` (до 200 символов после trim). Поиск регистронезависимый по буквальной подстроке `title` или `description`; `%` и `_` не служат шаблонами. Сортировка: `updatedAt DESC`, затем `id DESC`. Список не содержит `ingredients` и `steps`; детали содержат все поля. Пустой результат возвращает `items: []`, `total: 0`, `totalPages: 0`.
+
+Для всех ошибок используется `{"statusCode":400,"error":"Bad Request","message":["..."]}`. Неверный UUID даёт 400, отсутствующий рецепт — 404. В `PATCH` отсутствующее поле не меняется, `null` очищает только необязательное поле, массив заменяется целиком; пустой объект даёт 400. Неизвестные поля отклоняются. Swagger UI: `http://localhost:3000/api/docs`.
+
+### Пример полного цикла
+
+После входа скопируйте `accessToken` из ответа в переменную `TOKEN`:
+
+```sh
+TOKEN='<accessToken>'
+curl -i -X POST http://localhost:3000/api/v1/recipes \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"title":"Овсяные панкейки","ingredients":["2 яйца","80 г хлопьев"],"steps":["Смешать","Обжарить"],"prepTimeMinutes":15}'
+
+curl -i 'http://localhost:3000/api/v1/recipes?page=1&limit=20&search=панкейки'
+RECIPE_ID='<id из ответа POST>'
+curl -i "http://localhost:3000/api/v1/recipes/$RECIPE_ID"
+
+curl -i -X PATCH "http://localhost:3000/api/v1/recipes/$RECIPE_ID" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"description":"Быстрый завтрак","prepTimeMinutes":null}'
+
+curl -i -X DELETE "http://localhost:3000/api/v1/recipes/$RECIPE_ID" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Ручная матрица доступа
+
+Проверяйте временные рецепты на отдельной локальной базе. Подготовьте её и запустите API с отдельным портом (настройки JWT берутся из локального `.env`):
+
+```sh
+docker compose exec -T postgres createdb -U plate plate_manual_check
+CHECK_DATABASE_URL='postgresql://plate:plate_local@localhost:5433/plate_manual_check?schema=public'
+DATABASE_URL="$CHECK_DATABASE_URL" npm run db:migrate
+DATABASE_URL="$CHECK_DATABASE_URL" ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='<временный пароль от 12 символов>' npm run db:seed-admin
+DATABASE_URL="$CHECK_DATABASE_URL" ADMIN_EMAIL=reader@example.com ADMIN_PASSWORD='<другой временный пароль от 12 символов>' npm run db:seed-admin
+DATABASE_URL="$CHECK_DATABASE_URL" PORT=3100 npm run dev
+```
+
+Проверочный API будет доступен на `http://localhost:3100`. Для каждой из операций POST, PATCH и DELETE ожидаются: без токена и с неверным или истёкшим токеном — 401; с токеном пользователя `user` — 403; с токеном `admin` — успешный код из таблицы выше. GET списка и деталей работает без токена.
+
+Для получения `user` в отдельной проверочной базе можно создать вторую запись командой `db:seed-admin` с другим email, затем изменить её роль через `psql` только в этой базе:
+
+```sh
+docker compose exec -T postgres psql -U plate -d plate_manual_check \
+  -c "UPDATE \"User\" SET role = 'user' WHERE email = 'reader@example.com'"
+```
+
+Проверьте также поиск по `%` (`search=%25`) и `_`, пагинацию за последнюю страницу, пустой PATCH, `null` в обязательных полях, пустые элементы массивов, неизвестные поля, неверный UUID, повторное DELETE и отсутствие SQL или секретов в ответе 500.
+
+После проверки остановите проверочный API и удалите только созданную для неё базу: `docker compose exec -T postgres dropdb -U plate plate_manual_check`.
